@@ -923,12 +923,48 @@
                 const timeStr = `${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}`;
                 const filename = `Inventario_Historial_Completo_${dateStr}_${timeStr}.xlsx`;
 
-                // Save file
-                XLSX.writeFile(wb, filename);
+                // Generate Excel file as binary
+                const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                
+                // Create blob with proper MIME type for Excel
+                const blob = new Blob([excelBuffer], { 
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+                });
+                
+                // Create download link optimized for mobile browsers
+                const url = URL.createObjectURL(blob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = url;
+                downloadLink.download = filename;
+                
+                // Add attributes for better mobile compatibility
+                downloadLink.setAttribute('target', '_blank');
+                downloadLink.setAttribute('rel', 'noopener noreferrer');
+                
+                // Temporarily add to DOM and trigger download
+                document.body.appendChild(downloadLink);
+                
+                // Force download on mobile devices
+                if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                    // For mobile devices, especially Android Chrome
+                    downloadLink.style.display = 'none';
+                    downloadLink.click();
+                    
+                    // Clean up after a delay
+                    setTimeout(() => {
+                        document.body.removeChild(downloadLink);
+                        URL.revokeObjectURL(url);
+                    }, 1000);
+                } else {
+                    // For desktop browsers
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    URL.revokeObjectURL(url);
+                }
                 
                 // Show success message with details
                 setTimeout(() => {
-                    alert(`✅ ¡Descarga Excel completada exitosamente!\n\n📊 Detalles del archivo:\n• ${movements.length} movimientos totales\n• ${entradas.length} entradas registradas\n• ${salidas.length} salidas registradas\n• 4 hojas de cálculo incluidas\n\n📁 Archivo: ${filename}`);
+                    alert(`✅ ¡Descarga Excel iniciada!\n\n📊 Detalles del archivo:\n• ${movements.length} movimientos totales\n• ${entradas.length} entradas registradas\n• ${salidas.length} salidas registradas\n• 4 hojas de cálculo incluidas\n\n📁 Archivo: ${filename}\n\n📱 En Android: Revisa tu carpeta de Descargas o la notificación de descarga.`);
                     
                     // Restore button
                     document.querySelector('#downloadBtn span').textContent = document.querySelector('#downloadBtn span').textContent.includes('Excel') ? 'Descargar Excel' : 'Excel';
@@ -1944,6 +1980,5 @@
 
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98a03ec2c28d1350',t:'MTc1OTcwMjE4NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98a1cd4e6744e00f',t:'MTc1OTcxODUwOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
-
