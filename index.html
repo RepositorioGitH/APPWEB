@@ -6,6 +6,7 @@
     <title>Sistema de Inventario de Materiales</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -231,13 +232,14 @@
                     <span class="hidden sm:inline">Historial</span>
                     <span class="sm:hidden">Hist.</span>
                 </button>
-                <button id="downloadBtn" onclick="downloadExcel()" class="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 hover:transform hover:-translate-y-1 flex items-center justify-center space-x-1 sm:space-x-2 text-sm sm:text-base col-span-2 lg:col-span-1">
+                <button id="downloadBtn" onclick="downloadExcel()" class="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 hover:transform hover:-translate-y-1 flex items-center justify-center space-x-1 sm:space-x-2 text-sm sm:text-base">
                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m-6 4h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                     </svg>
-                    <span class="hidden sm:inline">Descargar Excel</span>
-                    <span class="sm:hidden">Excel</span>
+                    <span class="hidden sm:inline">Excel</span>
+                    <span class="sm:hidden">XLS</span>
                 </button>
+
             </div>
         </div>
 
@@ -757,89 +759,18 @@
                 document.getElementById('downloadBtn').style.display = 'none';
                 
                 // Modify grid layout for remaining buttons
-                const buttonsContainer = document.querySelector('.grid.grid-cols-2.md\\:grid-cols-4');
+                const buttonsContainer = document.querySelector('.grid.grid-cols-2.lg\\:grid-cols-4');
                 if (buttonsContainer) {
-                    buttonsContainer.className = 'grid grid-cols-2 md:grid-cols-2 gap-4';
+                    buttonsContainer.className = 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4';
                 }
             } else {
-                // Show all buttons for admin
+                // Show history and download buttons for admin
                 document.getElementById('historyBtn').style.display = 'flex';
                 document.getElementById('downloadBtn').style.display = 'flex';
             }
         }
 
-        // Excel download function
-        function downloadExcel() {
-            if (currentUser.role !== 'admin') {
-                alert('❌ No tienes permisos para descargar el historial');
-                return;
-            }
 
-            if (movements.length === 0) {
-                alert('⚠️ No hay movimientos para descargar');
-                return;
-            }
-
-            try {
-                // Sort movements by date (newest first)
-                const sortedMovements = [...movements].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-                // Prepare data for Excel
-                const excelData = sortedMovements.map((movement, index) => {
-                    let date;
-                    try {
-                        date = new Date(movement.date);
-                        if (isNaN(date.getTime())) {
-                            date = new Date();
-                        }
-                    } catch (e) {
-                        date = new Date();
-                    }
-
-                    const product = products.find(p => p.id === movement.productId);
-                    const productUnit = product ? product.unit : 'unidades';
-                    
-                    return {
-                        'No.': index + 1,
-                        'Fecha': date.toLocaleDateString('es-ES'),
-                        'Hora': date.toLocaleTimeString('es-ES'),
-                        'Producto': movement.productName || 'Sin nombre',
-                        'Tipo': movement.type === 'entrada' ? 'ENTRADA' : 'SALIDA',
-                        'Cantidad': movement.quantity || 0,
-                        'Unidad': productUnit,
-                        'Descripción': movement.description || 'Sin descripción'
-                    };
-                });
-
-                // Create workbook
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.json_to_sheet(excelData);
-
-                // Set column widths
-                const colWidths = [
-                    { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 35 }, 
-                    { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 45 }
-                ];
-                ws['!cols'] = colWidths;
-
-                XLSX.utils.book_append_sheet(wb, ws, 'Historial');
-
-                // Generate filename
-                const now = new Date();
-                const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
-                const timeStr = `${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}`;
-                const filename = `Inventario_${dateStr}_${timeStr}.xlsx`;
-
-                // Download file
-                XLSX.writeFile(wb, filename);
-                
-                alert(`✅ ¡Descarga completada!\n\nArchivo: ${filename}\nMovimientos: ${movements.length}`);
-                
-            } catch (error) {
-                console.error('Error generating Excel:', error);
-                alert('❌ Error al generar el archivo Excel');
-            }
-        }
 
         // Save data to localStorage
         function saveData() {
@@ -1669,7 +1600,134 @@
             }
         }
 
+        // Excel Download Functions
+        function downloadExcel() {
+            if (currentUser.role !== 'admin') {
+                alert('❌ No tienes permisos para descargar el historial');
+                return;
+            }
+
+            if (movements.length === 0) {
+                alert('⚠️ No hay movimientos para exportar');
+                return;
+            }
+
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Prepare data for Excel
+            const excelData = movements.map(movement => {
+                const date = new Date(movement.date);
+                return {
+                    'Fecha': date.toLocaleDateString('es-ES'),
+                    'Hora': date.toLocaleTimeString('es-ES'),
+                    'Producto': movement.productName,
+                    'Tipo': movement.type.charAt(0).toUpperCase() + movement.type.slice(1),
+                    'Cantidad': movement.quantity,
+                    'Descripción': movement.description
+                };
+            });
+
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, "Historial");
+            
+            // Generate filename with timestamp
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+            const filename = `Inventario_Historial_${timestamp}.xlsx`;
+            
+            // Generate file in memory and create URL
+            const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+            const blob = new Blob([wbout], { type: "application/octet-stream" });
+            
+            // Create temporary URL for the file
+            const url = URL.createObjectURL(blob);
+            
+            // Save URL in localStorage for later use
+            const downloadInfo = {
+                url: url,
+                filename: filename,
+                timestamp: now.toISOString(),
+                recordCount: movements.length
+            };
+            localStorage.setItem('ultimaURLDescarga', JSON.stringify(downloadInfo));
+            
+            // Create download link and add to page
+            const existingLink = document.getElementById('downloadLink');
+            if (existingLink) {
+                existingLink.remove();
+            }
+            
+            const linkContainer = document.createElement('div');
+            linkContainer.id = 'downloadLink';
+            linkContainer.className = 'fixed bottom-4 right-4 bg-green-600 text-white p-4 rounded-lg shadow-lg z-50';
+            linkContainer.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m-6 4h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold">📁 Excel generado</p>
+                        <p class="text-sm opacity-90">${filename}</p>
+                        <p class="text-xs text-green-200 mt-1">🔗 URL: ${url}</p>
+                        <a href="${url}" download="${filename}" class="text-green-200 underline text-sm hover:text-white">
+                            Descargar archivo
+                        </a>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-green-200 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(linkContainer);
+            
+            // Auto-remove notification after 15 seconds (more time to copy URL)
+            setTimeout(() => {
+                if (linkContainer.parentNode) {
+                    linkContainer.remove();
+                }
+            }, 15000);
+            
+            // Also trigger automatic download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            
+            alert(`✅ Archivo Excel generado exitosamente!\n\n📁 Archivo: ${filename}\n🔗 URL: ${url}\n\nLa URL también está guardada en localStorage como 'ultimaURLDescarga'`);
+            
+            // Log URL to console for debugging/Kodular access
+            console.log('Excel URL generada:', url);
+            console.log('Información completa:', downloadInfo);
+        }
+
+        // Function to get the last generated Excel URL
+        function getLastExcelURL() {
+            const savedInfo = localStorage.getItem('ultimaURLDescarga');
+            if (savedInfo) {
+                return JSON.parse(savedInfo);
+            }
+            return null;
+        }
+
+        // Function to show last generated Excel info
+        function showLastExcelInfo() {
+            const info = getLastExcelURL();
+            if (info) {
+                alert(`📊 Último Excel generado:\n📁 Archivo: ${info.filename}\n🕒 Fecha: ${new Date(info.timestamp).toLocaleString('es-ES')}\n📋 Registros: ${info.recordCount}\n🔗 URL: ${info.url}`);
+                console.log('URL del último Excel:', info.url);
+            } else {
+                alert('ℹ️ No hay archivos Excel generados previamente');
+            }
+        }
+
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98a1fc86a761da1f',t:'MTc1OTcyMDQ0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98b6e77e12aba38f',t:'MTc1OTkzOTc4My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
