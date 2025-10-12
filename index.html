@@ -6,6 +6,10 @@
     <title>Sistema de Inventario de Materiales</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -130,6 +134,10 @@
                         <p class="text-sm text-blue-100">Usuario: <span id="currentUser" class="font-semibold"></span></p>
                         <p class="text-sm text-blue-100">Rol: <span id="currentRole" class="font-semibold"></span></p>
                         <p class="text-xs text-blue-100 mt-1">Última actualización: <span id="lastUpdate">--</span></p>
+                        <div class="flex items-center space-x-1 mt-1">
+                            <div id="cloudStatus" class="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span class="text-xs text-blue-100">Sincronizado con la nube</span>
+                        </div>
                     </div>
                     <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -649,11 +657,26 @@
     </div>
 
     <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxYQlquny29jH6gO_C2WM6-xFA28R8Etk",
+            authDomain: "inventario-materiales-demo.firebaseapp.com",
+            projectId: "inventario-materiales-demo",
+            storageBucket: "inventario-materiales-demo.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456789012345678"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         // Data storage
-        let products = JSON.parse(localStorage.getItem('inventoryProducts')) || [];
-        let movements = JSON.parse(localStorage.getItem('inventoryMovements')) || [];
+        let products = [];
+        let movements = [];
         let currentMovementType = '';
         let currentUser = null;
+        let isDataLoaded = false;
 
         // User roles and authentication
         const users = {
@@ -671,6 +694,136 @@
                 login();
             });
         });
+
+        // Firebase Data Functions
+        async function loadDataFromFirebase() {
+            try {
+                showLoadingMessage('Cargando datos desde la nube...');
+                
+                // Load products
+                const productsSnapshot = await db.collection('products').orderBy('name').get();
+                products = [];
+                productsSnapshot.forEach(doc => {
+                    products.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Load movements
+                const movementsSnapshot = await db.collection('movements').orderBy('date', 'desc').get();
+                movements = [];
+                movementsSnapshot.forEach(doc => {
+                    movements.push({ id: doc.id, ...doc.data() });
+                });
+                
+                isDataLoaded = true;
+                hideLoadingMessage();
+                
+                // Update UI
+                renderProducts();
+                checkLowStock();
+                updateStats();
+                updateLastUpdate();
+                
+                console.log(`✅ Datos cargados: ${products.length} productos, ${movements.length} movimientos`);
+                
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+                hideLoadingMessage();
+                alert('⚠️ Error al cargar datos de la nube. Trabajando en modo offline.');
+                
+                // Fallback to localStorage if Firebase fails
+                products = JSON.parse(localStorage.getItem('inventoryProducts')) || [];
+                movements = JSON.parse(localStorage.getItem('inventoryMovements')) || [];
+                isDataLoaded = true;
+                
+                renderProducts();
+                checkLowStock();
+                updateStats();
+                updateLastUpdate();
+            }
+        }
+
+        async function saveProductToFirebase(product) {
+            try {
+                if (product.id && typeof product.id === 'string') {
+                    // Update existing product
+                    await db.collection('products').doc(product.id).update(product);
+                } else {
+                    // Add new product
+                    const docRef = await db.collection('products').add(product);
+                    product.id = docRef.id;
+                }
+                
+                // Also save to localStorage as backup
+                localStorage.setItem('inventoryProducts', JSON.stringify(products));
+                
+            } catch (error) {
+                console.error('Error guardando producto:', error);
+                alert('⚠️ Error al guardar en la nube. Los datos se guardaron localmente.');
+                localStorage.setItem('inventoryProducts', JSON.stringify(products));
+            }
+        }
+
+        async function saveMovementToFirebase(movement) {
+            try {
+                const docRef = await db.collection('movements').add(movement);
+                movement.id = docRef.id;
+                
+                // Also save to localStorage as backup
+                localStorage.setItem('inventoryMovements', JSON.stringify(movements));
+                
+            } catch (error) {
+                console.error('Error guardando movimiento:', error);
+                alert('⚠️ Error al guardar movimiento en la nube. Se guardó localmente.');
+                localStorage.setItem('inventoryMovements', JSON.stringify(movements));
+            }
+        }
+
+        async function deleteProductFromFirebase(productId) {
+            try {
+                // Delete product
+                await db.collection('products').doc(productId).delete();
+                
+                // Delete related movements
+                const movementsSnapshot = await db.collection('movements').where('productId', '==', productId).get();
+                const batch = db.batch();
+                movementsSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                
+                // Update localStorage backup
+                localStorage.setItem('inventoryProducts', JSON.stringify(products));
+                localStorage.setItem('inventoryMovements', JSON.stringify(movements));
+                
+            } catch (error) {
+                console.error('Error eliminando producto:', error);
+                alert('⚠️ Error al eliminar de la nube. Se eliminó localmente.');
+                localStorage.setItem('inventoryProducts', JSON.stringify(products));
+                localStorage.setItem('inventoryMovements', JSON.stringify(movements));
+            }
+        }
+
+        function showLoadingMessage(message) {
+            const existingLoader = document.getElementById('loadingMessage');
+            if (existingLoader) existingLoader.remove();
+            
+            const loader = document.createElement('div');
+            loader.id = 'loadingMessage';
+            loader.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2';
+            loader.innerHTML = `
+                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(loader);
+        }
+
+        function hideLoadingMessage() {
+            const loader = document.getElementById('loadingMessage');
+            if (loader) loader.remove();
+        }
 
         // Authentication functions
         function checkAuthentication() {
@@ -719,7 +872,7 @@
             document.getElementById('loginModal').classList.remove('flex');
         }
 
-        function showMainApp() {
+        async function showMainApp() {
             hideLoginModal();
             document.getElementById('mainHeader').classList.remove('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
@@ -735,11 +888,8 @@
             // Apply role-based restrictions
             applyRoleRestrictions();
             
-            // Initialize app data
-            renderProducts();
-            checkLowStock();
-            updateStats();
-            updateLastUpdate();
+            // Load data from Firebase
+            await loadDataFromFirebase();
             
             // Add search functionality
             document.getElementById('searchInput').addEventListener('input', function(e) {
@@ -772,10 +922,12 @@
 
 
 
-        // Save data to localStorage
-        function saveData() {
+        // Save data to Firebase and localStorage
+        async function saveData() {
+            // Always update localStorage as backup
             localStorage.setItem('inventoryProducts', JSON.stringify(products));
             localStorage.setItem('inventoryMovements', JSON.stringify(movements));
+            
             updateStats();
             updateLastUpdate();
         }
@@ -863,7 +1015,7 @@
         }
 
         // Add Product Form Handler
-        document.getElementById('addProductForm').addEventListener('submit', function(e) {
+        document.getElementById('addProductForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const name = document.getElementById('productName').value;
@@ -873,36 +1025,52 @@
             const minStock = parseInt(document.getElementById('minStock').value);
 
             const newProduct = {
-                id: Date.now(),
                 name: name,
                 brand: brand || '',
                 currentStock: quantity,
                 unit: unit,
                 minStock: minStock,
-                disabled: false
+                disabled: false,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.username
             };
 
-            products.push(newProduct);
-            
-            // Add initial movement only if quantity > 0
-            if (quantity > 0) {
-                movements.push({
-                    id: Date.now(),
-                    productId: newProduct.id,
-                    productName: brand ? `${name} (${brand})` : name,
-                    type: 'entrada',
-                    quantity: quantity,
-                    description: 'Stock inicial',
-                    date: new Date().toISOString()
-                });
-            }
+            try {
+                showLoadingMessage('Guardando producto...');
+                
+                // Save to Firebase
+                await saveProductToFirebase(newProduct);
+                products.push(newProduct);
+                
+                // Add initial movement only if quantity > 0
+                if (quantity > 0) {
+                    const initialMovement = {
+                        productId: newProduct.id,
+                        productName: brand ? `${name} (${brand})` : name,
+                        type: 'entrada',
+                        quantity: quantity,
+                        description: 'Stock inicial',
+                        date: new Date().toISOString(),
+                        createdBy: currentUser.username
+                    };
+                    
+                    await saveMovementToFirebase(initialMovement);
+                    movements.unshift(initialMovement);
+                }
 
-            saveData();
-            renderProducts();
-            checkLowStock();
-            hideAddProductModal();
-            
-            alert('✅ Producto agregado exitosamente');
+                await saveData();
+                renderProducts();
+                checkLowStock();
+                hideAddProductModal();
+                hideLoadingMessage();
+                
+                alert('✅ Producto agregado exitosamente y sincronizado en la nube');
+                
+            } catch (error) {
+                hideLoadingMessage();
+                console.error('Error agregando producto:', error);
+                alert('⚠️ Error al guardar en la nube, pero se guardó localmente');
+            }
         });
 
         // Movement Modal Functions
@@ -967,10 +1135,10 @@
         }
 
         // Movement Form Handler
-        document.getElementById('movementForm').addEventListener('submit', function(e) {
+        document.getElementById('movementForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const productId = parseInt(document.getElementById('movementProduct').value);
+            const productId = document.getElementById('movementProduct').value;
             const quantity = parseInt(document.getElementById('movementQuantity').value);
             const description = document.getElementById('movementDescription').value;
             
@@ -981,36 +1149,52 @@
                 return;
             }
 
-            // Update product stock
-            if (currentMovementType === 'entrada') {
-                product.currentStock += quantity;
-            } else {
-                product.currentStock -= quantity;
+            try {
+                showLoadingMessage('Registrando movimiento...');
+                
+                // Update product stock
+                if (currentMovementType === 'entrada') {
+                    product.currentStock += quantity;
+                } else {
+                    product.currentStock -= quantity;
+                }
+
+                // Save updated product to Firebase
+                await saveProductToFirebase(product);
+
+                // Add movement record
+                const displayName = product.brand ? `${product.name} (${product.brand})` : product.name;
+                const newMovement = {
+                    productId: productId,
+                    productName: displayName,
+                    type: currentMovementType,
+                    quantity: quantity,
+                    description: description || `${currentMovementType === 'entrada' ? 'Entrada' : 'Salida'} de material`,
+                    date: new Date().toISOString(),
+                    createdBy: currentUser.username
+                };
+
+                await saveMovementToFirebase(newMovement);
+                movements.unshift(newMovement);
+
+                // Save and update everything
+                await saveData();
+                renderProducts();
+                checkLowStock();
+                updateStats();
+                hideMovementModal();
+                hideLoadingMessage();
+                
+                const message = currentMovementType === 'entrada' ? 
+                    '✅ Entrada registrada exitosamente y sincronizada' : 
+                    '✅ Salida registrada exitosamente y sincronizada';
+                alert(message);
+                
+            } catch (error) {
+                hideLoadingMessage();
+                console.error('Error registrando movimiento:', error);
+                alert('⚠️ Error al sincronizar con la nube, pero se guardó localmente');
             }
-
-            // Add movement record
-            const displayName = product.brand ? `${product.name} (${product.brand})` : product.name;
-            movements.push({
-                id: Date.now(),
-                productId: productId,
-                productName: displayName,
-                type: currentMovementType,
-                quantity: quantity,
-                description: description || `${currentMovementType === 'entrada' ? 'Entrada' : 'Salida'} de material`,
-                date: new Date().toISOString()
-            });
-
-            // Save and update everything
-            saveData();
-            renderProducts();
-            checkLowStock();
-            updateStats();
-            hideMovementModal();
-            
-            const message = currentMovementType === 'entrada' ? 
-                '✅ Entrada registrada exitosamente' : 
-                '✅ Salida registrada exitosamente';
-            alert(message);
         });
 
         // Edit Product Functions
@@ -1038,10 +1222,10 @@
         }
 
         // Edit Product Form Handler
-        document.getElementById('editProductForm').addEventListener('submit', function(e) {
+        document.getElementById('editProductForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const productId = parseInt(document.getElementById('editProductId').value);
+            const productId = document.getElementById('editProductId').value;
             const product = products.find(p => p.id === productId);
             
             product.name = document.getElementById('editProductName').value;
@@ -1049,13 +1233,26 @@
             // Stock is not editable - only modified through entries/exits
             product.unit = document.getElementById('editUnit').value;
             product.minStock = parseInt(document.getElementById('editMinStock').value);
+            product.updatedAt = new Date().toISOString();
+            product.updatedBy = currentUser.username;
 
-            saveData();
-            renderProducts();
-            checkLowStock();
-            hideEditProductModal();
-            
-            alert('✅ Producto actualizado exitosamente');
+            try {
+                showLoadingMessage('Actualizando producto...');
+                
+                await saveProductToFirebase(product);
+                await saveData();
+                renderProducts();
+                checkLowStock();
+                hideEditProductModal();
+                hideLoadingMessage();
+                
+                alert('✅ Producto actualizado exitosamente y sincronizado');
+                
+            } catch (error) {
+                hideLoadingMessage();
+                console.error('Error actualizando producto:', error);
+                alert('⚠️ Error al sincronizar con la nube, pero se guardó localmente');
+            }
         });
 
         // Delete Products Modal Functions
@@ -1166,39 +1363,45 @@
             deleteSelectedProducts(selectedIds);
         }
 
-        function deleteSelectedProducts(productIds) {
+        async function deleteSelectedProducts(productIds) {
             try {
+                showLoadingMessage('Eliminando productos...');
+                
                 let deletedCount = 0;
                 let totalMovementsDeleted = 0;
                 
+                // Count movements to be deleted
                 productIds.forEach(productId => {
                     const product = products.find(p => p.id === productId);
                     if (product) {
-                        // Contar movimientos que se van a eliminar
                         const productMovements = movements.filter(m => m.productId === productId);
                         totalMovementsDeleted += productMovements.length;
-                        
                         deletedCount++;
                     }
                 });
                 
-                // Eliminar los productos del array
-                products = products.filter(p => !productIds.includes(p.id));
+                // Delete from Firebase
+                for (const productId of productIds) {
+                    await deleteProductFromFirebase(productId);
+                }
                 
-                // Eliminar TODOS los movimientos relacionados con estos productos
+                // Update local arrays
+                products = products.filter(p => !productIds.includes(p.id));
                 movements = movements.filter(m => !productIds.includes(m.productId));
                 
-                // Guardar datos
-                saveData();
+                // Save data
+                await saveData();
                 renderProducts();
                 checkLowStock();
                 hideDeleteProductsModal();
+                hideLoadingMessage();
                 
-                alert(`✅ ${deletedCount} producto(s) eliminado(s) completamente del sistema.\n📋 Se eliminaron ${totalMovementsDeleted} registros del historial.`);
+                alert(`✅ ${deletedCount} producto(s) eliminado(s) completamente del sistema y sincronizado.\n📋 Se eliminaron ${totalMovementsDeleted} registros del historial.`);
                 
             } catch (error) {
+                hideLoadingMessage();
                 console.error('Error eliminando productos:', error);
-                alert('❌ Error al eliminar los productos. Por favor, intenta de nuevo.');
+                alert('❌ Error al eliminar los productos de la nube. Se eliminaron localmente.');
             }
         }
 
@@ -1208,7 +1411,7 @@
         }
 
         // Función para eliminar un producto por su id
-        function deleteProduct(productId) {
+        async function deleteProduct(productId) {
             const product = products.find(p => p.id === productId);
             if (!product) {
                 alert('❌ Error: Producto no encontrado');
@@ -1218,22 +1421,27 @@
             const displayName = product.brand ? `${product.name} (${product.brand})` : product.name;
             
             try {
-                // Eliminar el producto del array
-                products = products.filter(p => p.id !== productId);
+                showLoadingMessage('Eliminando producto...');
                 
-                // Eliminar TODOS los movimientos relacionados con este producto
+                // Delete from Firebase
+                await deleteProductFromFirebase(productId);
+                
+                // Update local arrays
+                products = products.filter(p => p.id !== productId);
                 movements = movements.filter(m => m.productId !== productId);
                 
-                // Guardar cambios
-                saveData();
+                // Save changes
+                await saveData();
                 renderProducts();
                 checkLowStock();
+                hideLoadingMessage();
                 
-                alert(`✅ Producto "${displayName}" eliminado completamente del sistema.`);
+                alert(`✅ Producto "${displayName}" eliminado completamente del sistema y sincronizado.`);
                 
             } catch (error) {
+                hideLoadingMessage();
                 console.error('Error eliminando producto:', error);
-                alert('❌ Error al eliminar el producto. Por favor, intenta de nuevo.');
+                alert('❌ Error al eliminar de la nube. Se eliminó localmente.');
             }
         }
 
@@ -1729,5 +1937,5 @@
 
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98b6e77e12aba38f',t:'MTc1OTkzOTc4My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98d7492fa770ddd5',t:'MTc2MDI3OTMyOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
