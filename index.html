@@ -214,7 +214,7 @@
         <!-- Action Buttons -->
         <div class="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 card-shadow mb-6 sm:mb-8">
             <h3 class="text-base sm:text-lg font-semibold text-gray-800 mb-4">Acciones Rápidas</h3>
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
                 <button onclick="showAddProductModal()" class="btn-primary text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold flex items-center justify-center space-x-1 sm:space-x-2 text-sm sm:text-base">
                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -246,6 +246,13 @@
                     </svg>
                     <span class="hidden sm:inline">Excel</span>
                     <span class="sm:hidden">XLS</span>
+                </button>
+                <button id="kodularBtn" onclick="showKodularInfo()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 hover:transform hover:-translate-y-1 flex items-center justify-center space-x-1 sm:space-x-2 text-sm sm:text-base">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="hidden sm:inline">Kodular</span>
+                    <span class="sm:hidden">📱</span>
                 </button>
 
             </div>
@@ -975,19 +982,21 @@
 
         function applyRoleRestrictions() {
             if (currentUser.role === 'user') {
-                // Hide history and download buttons for regular users
+                // Hide history, download and kodular buttons for regular users
                 document.getElementById('historyBtn').style.display = 'none';
                 document.getElementById('downloadBtn').style.display = 'none';
+                document.getElementById('kodularBtn').style.display = 'none';
                 
                 // Modify grid layout for remaining buttons
-                const buttonsContainer = document.querySelector('.grid.grid-cols-2.lg\\:grid-cols-4');
+                const buttonsContainer = document.querySelector('.grid.grid-cols-2.lg\\:grid-cols-5');
                 if (buttonsContainer) {
                     buttonsContainer.className = 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4';
                 }
             } else {
-                // Show history and download buttons for admin
+                // Show all buttons for admin
                 document.getElementById('historyBtn').style.display = 'flex';
                 document.getElementById('downloadBtn').style.display = 'flex';
+                document.getElementById('kodularBtn').style.display = 'flex';
             }
         }
 
@@ -2172,61 +2181,288 @@ window.AppInventor.setWebViewString(parsedData.base64Data);
             document.body.appendChild(helpModal);
         }
 
-        // Function to get Excel data for Kodular (can be called from Kodular)
+        // ===== FUNCIONES ESPECÍFICAS PARA KODULAR =====
+        
+        // Función principal para obtener datos Excel desde Kodular
         function getExcelDataForKodular() {
-            const data = localStorage.getItem('kodularExcelData');
-            if (data) {
-                const parsed = JSON.parse(data);
-                return {
-                    success: true,
-                    filename: parsed.filename,
-                    base64: parsed.base64Data,
-                    timestamp: parsed.timestamp,
-                    recordCount: parsed.recordCount,
-                    fileSize: parsed.fileSize
-                };
+            try {
+                const data = localStorage.getItem('kodularExcelData');
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    return JSON.stringify({
+                        success: true,
+                        filename: parsed.filename,
+                        base64: parsed.base64Data,
+                        timestamp: parsed.timestamp,
+                        recordCount: parsed.recordCount,
+                        fileSize: parsed.fileSize
+                    });
+                }
+                return JSON.stringify({
+                    success: false,
+                    message: 'No hay datos de Excel disponibles'
+                });
+            } catch (error) {
+                return JSON.stringify({
+                    success: false,
+                    message: 'Error al obtener datos: ' + error.message
+                });
             }
-            return {
-                success: false,
-                message: 'No hay datos de Excel disponibles'
-            };
         }
 
-        // Function to get only Base64 data (simpler for Kodular)
+        // Función simple para obtener solo el Base64 (más fácil para Kodular)
         function getExcelBase64() {
-            return localStorage.getItem('excelBase64') || null;
+            const base64 = localStorage.getItem('excelBase64');
+            return base64 || '';
         }
 
-        // Function to get filename (for Kodular)
+        // Función para obtener el nombre del archivo
         function getExcelFilename() {
-            return localStorage.getItem('excelFilename') || 'inventario.xlsx';
+            const filename = localStorage.getItem('excelFilename');
+            return filename || 'inventario_' + new Date().toISOString().slice(0,10) + '.xlsx';
         }
 
-        // Function to check if Excel data is available
+        // Función para verificar si hay datos disponibles
         function hasExcelData() {
             return localStorage.getItem('kodularExcelData') !== null;
         }
 
-        // Legacy function for compatibility
-        function getLastExcelURL() {
-            const savedInfo = localStorage.getItem('ultimaURLDescarga');
-            if (savedInfo) {
-                return JSON.parse(savedInfo);
+        // Función para generar Excel específicamente para Kodular (sin descarga automática)
+        function generateExcelForKodular() {
+            if (currentUser.role !== 'admin') {
+                return JSON.stringify({
+                    success: false,
+                    message: 'No tienes permisos para generar Excel'
+                });
             }
-            return null;
+
+            if (movements.length === 0) {
+                return JSON.stringify({
+                    success: false,
+                    message: 'No hay movimientos para exportar'
+                });
+            }
+
+            try {
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                
+                // Prepare data for Excel
+                const excelData = movements.map(movement => {
+                    const date = new Date(movement.date);
+                    return {
+                        'Fecha': date.toLocaleDateString('es-ES'),
+                        'Hora': date.toLocaleTimeString('es-ES'),
+                        'Producto': movement.productName,
+                        'Tipo': movement.type.charAt(0).toUpperCase() + movement.type.slice(1),
+                        'Cantidad': movement.quantity,
+                        'Descripción': movement.description
+                    };
+                });
+
+                // Create worksheet
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, "Historial");
+                
+                // Generate filename with timestamp
+                const now = new Date();
+                const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+                const filename = `Inventario_Historial_${timestamp}.xlsx`;
+                
+                // Generate file as base64
+                const wbout = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+                
+                // Calculate file size
+                const binaryString = atob(wbout);
+                const fileSize = binaryString.length;
+                
+                // Save data for Kodular access
+                const downloadInfo = {
+                    filename: filename,
+                    timestamp: now.toISOString(),
+                    recordCount: movements.length,
+                    base64Data: wbout,
+                    fileSize: fileSize,
+                    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                };
+                
+                // Save in multiple formats for maximum compatibility
+                localStorage.setItem('kodularExcelData', JSON.stringify(downloadInfo));
+                localStorage.setItem('excelBase64', wbout);
+                localStorage.setItem('excelFilename', filename);
+                localStorage.setItem('excelTimestamp', now.toISOString());
+                localStorage.setItem('excelRecordCount', movements.length.toString());
+                
+                // Return success response
+                return JSON.stringify({
+                    success: true,
+                    filename: filename,
+                    base64: wbout,
+                    timestamp: now.toISOString(),
+                    recordCount: movements.length,
+                    fileSize: fileSize,
+                    message: 'Excel generado exitosamente para Kodular'
+                });
+                
+            } catch (error) {
+                return JSON.stringify({
+                    success: false,
+                    message: 'Error generando Excel: ' + error.message
+                });
+            }
         }
 
-        function showLastExcelInfo() {
-            const info = getLastExcelURL();
-            if (info) {
-                alert(`📊 Último Excel generado:\n📁 Archivo: ${info.filename}\n🕒 Fecha: ${new Date(info.timestamp).toLocaleString('es-ES')}\n📋 Registros: ${info.recordCount}\n💾 Disponible en localStorage como 'kodularExcelData'`);
-                console.log('Datos Excel para Kodular:', info);
-            } else {
-                alert('ℹ️ No hay archivos Excel generados previamente');
+        // Función para obtener información del último Excel generado
+        function getLastExcelInfo() {
+            try {
+                const data = localStorage.getItem('kodularExcelData');
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    return JSON.stringify({
+                        success: true,
+                        filename: parsed.filename,
+                        timestamp: parsed.timestamp,
+                        recordCount: parsed.recordCount,
+                        fileSize: parsed.fileSize,
+                        hasData: true
+                    });
+                }
+                return JSON.stringify({
+                    success: false,
+                    message: 'No hay Excel generado previamente',
+                    hasData: false
+                });
+            } catch (error) {
+                return JSON.stringify({
+                    success: false,
+                    message: 'Error obteniendo información: ' + error.message,
+                    hasData: false
+                });
             }
         }
+
+        // Función para limpiar datos de Excel (útil para testing)
+        function clearExcelData() {
+            localStorage.removeItem('kodularExcelData');
+            localStorage.removeItem('excelBase64');
+            localStorage.removeItem('excelFilename');
+            localStorage.removeItem('excelTimestamp');
+            localStorage.removeItem('excelRecordCount');
+            return JSON.stringify({
+                success: true,
+                message: 'Datos de Excel limpiados'
+            });
+        }
+
+        // Función para obtener estadísticas del inventario (útil para Kodular)
+        function getInventoryStats() {
+            try {
+                const lowStockProducts = products.filter(p => p.currentStock <= p.minStock);
+                const today = new Date().toISOString().split('T')[0];
+                const todayMovements = movements.filter(m => {
+                    try {
+                        let movementDate;
+                        if (m.date.includes('T')) {
+                            movementDate = m.date.split('T')[0];
+                        } else {
+                            const parsedDate = new Date(m.date);
+                            if (!isNaN(parsedDate.getTime())) {
+                                movementDate = parsedDate.toISOString().split('T')[0];
+                            } else {
+                                return false;
+                            }
+                        }
+                        return movementDate === today;
+                    } catch (e) {
+                        return false;
+                    }
+                });
+                
+                const todayEntries = todayMovements.filter(m => m.type === 'entrada').reduce((sum, m) => sum + m.quantity, 0);
+                const todayExits = todayMovements.filter(m => m.type === 'salida').reduce((sum, m) => sum + m.quantity, 0);
+                
+                return JSON.stringify({
+                    success: true,
+                    totalProducts: products.length,
+                    lowStockCount: lowStockProducts.length,
+                    todayEntries: todayEntries,
+                    todayExits: todayExits,
+                    totalMovements: movements.length,
+                    lastUpdate: new Date().toISOString()
+                });
+            } catch (error) {
+                return JSON.stringify({
+                    success: false,
+                    message: 'Error obteniendo estadísticas: ' + error.message
+                });
+            }
+        }
+
+        // Función para mostrar información de ayuda para Kodular
+        function showKodularInfo() {
+            const info = `🔧 FUNCIONES DISPONIBLES PARA KODULAR:
+
+📊 GENERAR EXCEL:
+• generateExcelForKodular() - Genera nuevo Excel
+• getExcelBase64() - Obtiene datos Base64
+• getExcelFilename() - Obtiene nombre archivo
+• hasExcelData() - Verifica si hay datos
+
+📋 OBTENER DATOS:
+• getExcelDataForKodular() - Datos completos JSON
+• getLastExcelInfo() - Info del último Excel
+• getInventoryStats() - Estadísticas del inventario
+
+🧹 UTILIDADES:
+• clearExcelData() - Limpia datos Excel
+
+💾 CLAVES LOCALSTORAGE:
+• kodularExcelData - Objeto completo
+• excelBase64 - Solo Base64
+• excelFilename - Solo nombre archivo
+• excelTimestamp - Fecha generación
+
+🔍 EJEMPLO USO EN KODULAR:
+1. Llama generateExcelForKodular()
+2. Obtén respuesta JSON
+3. Si success=true, usa el base64
+4. Guarda con File component`;
+
+            alert(info);
+            console.log('=== KODULAR INTEGRATION INFO ===');
+            console.log('Available functions:', [
+                'generateExcelForKodular()',
+                'getExcelBase64()',
+                'getExcelFilename()',
+                'hasExcelData()',
+                'getExcelDataForKodular()',
+                'getLastExcelInfo()',
+                'getInventoryStats()',
+                'clearExcelData()'
+            ]);
+            console.log('LocalStorage keys:', [
+                'kodularExcelData',
+                'excelBase64', 
+                'excelFilename',
+                'excelTimestamp',
+                'excelRecordCount'
+            ]);
+        }
+
+        // Exponer funciones globalmente para Kodular
+        window.generateExcelForKodular = generateExcelForKodular;
+        window.getExcelBase64 = getExcelBase64;
+        window.getExcelFilename = getExcelFilename;
+        window.hasExcelData = hasExcelData;
+        window.getExcelDataForKodular = getExcelDataForKodular;
+        window.getLastExcelInfo = getLastExcelInfo;
+        window.clearExcelData = clearExcelData;
+        window.getInventoryStats = getInventoryStats;
+        window.showKodularInfo = showKodularInfo;
 
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98eab9d375093341',t:'MTc2MDQ4MzE3Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98eaca14818d3341',t:'MTc2MDQ4MzgzOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
