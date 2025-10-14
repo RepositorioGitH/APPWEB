@@ -1915,15 +1915,44 @@
                 // Add worksheet to workbook
                 XLSX.utils.book_append_sheet(wb, ws, "Historial");
                 
+                // Generate Excel file as binary string
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                
+                // Convert binary string to array buffer
+                function s2ab(s) {
+                    const buf = new ArrayBuffer(s.length);
+                    const view = new Uint8Array(buf);
+                    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+                    return buf;
+                }
+                
+                // Create blob
+                const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                
+                // Create download URL
+                const url = URL.createObjectURL(blob);
+                
                 // Generate filename with timestamp
                 const now = new Date();
                 const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
                 const filename = `Inventario_Historial_${timestamp}.xlsx`;
                 
-                // Write file and trigger download
-                XLSX.writeFile(wb, filename);
+                // Create download link
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.style.display = 'none';
                 
-                alert(`✅ Archivo Excel descargado: ${filename}`);
+                // Add to DOM, click, and remove
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                // Clean up URL object
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                
+                // Show success message with URL for Kodular
+                alert(`✅ Archivo Excel generado correctamente!\n\n📁 Nombre: ${filename}\n🔗 URL temporal: ${url}\n\n💡 Para Kodular: Usa el componente File y la URL generada`);
                 
             } catch (error) {
                 console.error('❌ Error generando Excel:', error);
@@ -1935,5 +1964,5 @@
 
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98eadadac02b5c64',t:'MTc2MDQ4NDUyNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98eaefc1b71d5c64',t:'MTc2MDQ4NTM4MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
