@@ -658,14 +658,26 @@
 
     <script>
         // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBxYQlquny29jH6gO_C2WM6-xFA28R8Etk",
-            authDomain: "inventario-materiales-demo.firebaseapp.com",
-            projectId: "inventario-materiales-demo",
-            storageBucket: "inventario-materiales-demo.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdef123456789012345678"
-        };
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyACesqO7FzKqWx7if1kA67yT_boOkzoR2g",
+  authDomain: "control-de-inventario-ed208.firebaseapp.com",
+  projectId: "control-de-inventario-ed208",
+  storageBucket: "control-de-inventario-ed208.firebasestorage.app",
+  messagingSenderId: "836671570817",
+  appId: "1:836671570817:web:d13d629a4fdbde0299de80",
+  measurementId: "G-50BX6RG48G"
+};
+
+// Initialize Firebase
+
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -1939,3 +1951,4 @@
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98d7492fa770ddd5',t:'MTc2MDI3OTMyOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
+
