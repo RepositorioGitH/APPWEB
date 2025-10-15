@@ -1960,9 +1960,266 @@
             }
         }
 
+        // ========================================
+        // 🔥 FUNCIONES PARA KODULAR
+        // ========================================
+
+        // Función para preparar datos para Kodular
+        function prepareDataForKodular() {
+            try {
+                // Preparar datos del inventario
+                const inventoryData = {
+                    timestamp: new Date().toISOString(),
+                    user: currentUser ? currentUser.name : 'Usuario',
+                    totalProducts: products.length,
+                    lowStockCount: products.filter(p => p.currentStock <= p.minStock).length,
+                    products: products.map(product => ({
+                        id: product.id,
+                        name: product.name,
+                        brand: product.brand || '',
+                        currentStock: product.currentStock,
+                        unit: product.unit,
+                        minStock: product.minStock,
+                        status: product.currentStock <= product.minStock ? 'BAJO' : 'NORMAL',
+                        disabled: product.disabled || false
+                    })),
+                    movements: movements.map(movement => {
+                        const date = new Date(movement.date);
+                        return {
+                            id: movement.id,
+                            productName: movement.productName,
+                            type: movement.type.toUpperCase(),
+                            quantity: movement.quantity,
+                            description: movement.description,
+                            date: date.toLocaleDateString('es-ES'),
+                            time: date.toLocaleTimeString('es-ES'),
+                            timestamp: movement.date
+                        };
+                    }),
+                    stats: {
+                        todayEntries: getTodayMovements('entrada'),
+                        todayExits: getTodayMovements('salida'),
+                        lowStockProducts: products.filter(p => p.currentStock <= p.minStock).map(p => ({
+                            name: p.name,
+                            brand: p.brand || '',
+                            currentStock: p.currentStock,
+                            minStock: p.minStock,
+                            unit: p.unit
+                        }))
+                    }
+                };
+
+                // Guardar en localStorage para que Kodular pueda acceder
+                localStorage.setItem('kodularInventoryData', JSON.stringify(inventoryData));
+                
+                console.log('✅ Datos preparados para Kodular:', inventoryData);
+                return inventoryData;
+                
+            } catch (error) {
+                console.error('❌ Error preparando datos para Kodular:', error);
+                return null;
+            }
+        }
+
+        // Función auxiliar para obtener movimientos de hoy
+        function getTodayMovements(type) {
+            const today = new Date().toISOString().split('T')[0];
+            return movements.filter(m => {
+                try {
+                    let movementDate;
+                    if (m.date.includes('T')) {
+                        movementDate = m.date.split('T')[0];
+                    } else {
+                        const parsedDate = new Date(m.date);
+                        if (!isNaN(parsedDate.getTime())) {
+                            movementDate = parsedDate.toISOString().split('T')[0];
+                        } else {
+                            return false;
+                        }
+                    }
+                    return movementDate === today && m.type === type;
+                } catch (e) {
+                    return false;
+                }
+            }).reduce((sum, m) => sum + m.quantity, 0);
+        }
+
+        // Función que Kodular ejecutará para obtener datos
+        function sendDataToKodular() {
+            try {
+                const data = prepareDataForKodular();
+                
+                if (data && window.AppInventor && window.AppInventor.setWebViewString) {
+                    // Enviar datos a Kodular
+                    window.AppInventor.setWebViewString(JSON.stringify({
+                        success: true,
+                        message: 'Datos del inventario obtenidos correctamente',
+                        data: data
+                    }));
+                    
+                    console.log('✅ Datos enviados a Kodular exitosamente');
+                    
+                } else if (data) {
+                    // Fallback: solo guardar en localStorage
+                    console.log('⚠️ AppInventor no disponible, datos guardados en localStorage');
+                    
+                    // Mostrar notificación en la web
+                    showNotification('📱 Datos preparados para Kodular - Revisa localStorage', 'success');
+                    
+                } else {
+                    throw new Error('No se pudieron preparar los datos');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error enviando datos a Kodular:', error);
+                
+                // Enviar error a Kodular si es posible
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify({
+                        success: false,
+                        message: 'Error al obtener datos del inventario',
+                        error: error.message
+                    }));
+                }
+                
+                showNotification('❌ Error preparando datos para Kodular', 'error');
+            }
+        }
+
+        // Función para generar Excel y enviarlo a Kodular
+        function generateExcelForKodular() {
+            try {
+                if (movements.length === 0) {
+                    if (window.AppInventor && window.AppInventor.setWebViewString) {
+                        window.AppInventor.setWebViewString(JSON.stringify({
+                            success: false,
+                            message: 'No hay movimientos para exportar'
+                        }));
+                    }
+                    return;
+                }
+
+                // Crear datos para Excel
+                const excelData = movements.map(movement => {
+                    const date = new Date(movement.date);
+                    return {
+                        'Fecha': date.toLocaleDateString('es-ES'),
+                        'Hora': date.toLocaleTimeString('es-ES'),
+                        'Producto': movement.productName,
+                        'Tipo': movement.type.charAt(0).toUpperCase() + movement.type.slice(1),
+                        'Cantidad': movement.quantity,
+                        'Descripción': movement.description
+                    };
+                });
+
+                // Crear workbook
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                XLSX.utils.book_append_sheet(wb, ws, "Historial");
+                
+                // Generar archivo como base64
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+                
+                // Preparar datos para Kodular
+                const now = new Date();
+                const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+                const filename = `Inventario_Historial_${timestamp}.xlsx`;
+                
+                const excelResult = {
+                    success: true,
+                    message: 'Excel generado correctamente',
+                    filename: filename,
+                    base64Data: wbout,
+                    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    recordCount: movements.length,
+                    generatedAt: now.toISOString()
+                };
+
+                // Guardar en localStorage
+                localStorage.setItem('kodularExcelData', JSON.stringify(excelResult));
+
+                // Enviar a Kodular
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify(excelResult));
+                }
+
+                console.log('✅ Excel generado para Kodular:', filename);
+                showNotification('📊 Excel generado para Kodular', 'success');
+
+            } catch (error) {
+                console.error('❌ Error generando Excel para Kodular:', error);
+                
+                const errorResult = {
+                    success: false,
+                    message: 'Error al generar Excel',
+                    error: error.message
+                };
+
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify(errorResult));
+                }
+                
+                showNotification('❌ Error generando Excel', 'error');
+            }
+        }
+
+        // Función para obtener solo productos con stock bajo
+        function getLowStockForKodular() {
+            try {
+                const lowStockProducts = products.filter(p => p.currentStock <= p.minStock);
+                
+                const result = {
+                    success: true,
+                    message: `${lowStockProducts.length} productos con stock bajo`,
+                    count: lowStockProducts.length,
+                    products: lowStockProducts.map(product => ({
+                        name: product.name,
+                        brand: product.brand || '',
+                        currentStock: product.currentStock,
+                        minStock: product.minStock,
+                        unit: product.unit,
+                        difference: product.minStock - product.currentStock
+                    }))
+                };
+
+                localStorage.setItem('kodularLowStockData', JSON.stringify(result));
+
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify(result));
+                }
+
+                console.log('✅ Datos de stock bajo enviados a Kodular');
+                
+            } catch (error) {
+                console.error('❌ Error obteniendo stock bajo:', error);
+                
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify({
+                        success: false,
+                        message: 'Error al obtener productos con stock bajo',
+                        error: error.message
+                    }));
+                }
+            }
+        }
+
+        // Actualizar datos automáticamente cuando cambien
+        function updateKodularData() {
+            if (isDataLoaded) {
+                prepareDataForKodular();
+            }
+        }
+
+        // Llamar a updateKodularData cuando se actualicen los datos
+        const originalSaveData = saveData;
+        saveData = async function() {
+            await originalSaveData();
+            updateKodularData();
+        };
+
 
 
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98eaefc1b71d5c64',t:'MTc2MDQ4NTM4MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ec1875b2d4dfba',t:'MTc2MDQ5NzUzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
