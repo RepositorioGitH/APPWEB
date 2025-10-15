@@ -85,11 +85,11 @@
             <div class="block lg:hidden">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
-                        <div class="bg-white bg-opacity-20 p-2 rounded-lg">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button onclick="reloadApp()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition-all duration-300 hover:scale-105 group" title="Recargar aplicación">
+                            <svg class="w-6 h-6 text-white group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                             </svg>
-                        </div>
+                        </button>
                         <div>
                             <h1 class="text-xl sm:text-2xl font-bold">Sistema de Inventario</h1>
                             <p class="text-blue-100 text-sm hidden sm:block">Control de materiales</p>
@@ -119,11 +119,11 @@
             <!-- Desktop Layout -->
             <div class="hidden lg:flex items-center justify-between">
                 <div class="flex items-center space-x-4">
-                    <div class="bg-white bg-opacity-20 p-3 rounded-xl">
-                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button onclick="reloadApp()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-xl transition-all duration-300 hover:scale-105 group" title="Recargar aplicación">
+                        <svg class="w-8 h-8 text-white group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                         </svg>
-                    </div>
+                    </button>
                     <div>
                         <h1 class="text-3xl font-bold">Sistema de Inventario</h1>
                         <p class="text-blue-100 mt-1">Control profesional de materiales y stock</p>
@@ -2217,9 +2217,29 @@
             updateKodularData();
         };
 
+        // Función para recargar la aplicación
+        function reloadApp() {
+            // Mostrar confirmación antes de recargar
+            const userConfirmed = confirm('🔄 ¿Estás seguro de que quieres recargar la aplicación?\n\nEsto actualizará todos los datos desde la nube.');
+            
+            if (userConfirmed) {
+                // Mostrar mensaje de recarga
+                showLoadingMessage('🔄 Recargando aplicación...');
+                
+                // Limpiar datos locales para forzar recarga desde Firebase
+                localStorage.removeItem('inventoryProducts');
+                localStorage.removeItem('inventoryMovements');
+                
+                // Recargar la página después de un breve delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        }
+
 
 
 
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ec1875b2d4dfba',t:'MTc2MDQ5NzUzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ec348992b9dfba',t:'MTc2MDQ5ODY4NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
