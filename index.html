@@ -2240,17 +2240,17 @@
         }
 
 
-// === NUEVA FUNCIÓN PARA DESCARGA DIRECTA COMPATIBLE CON KODULAR ===
-// Esta función genera el archivo Excel y devuelve un enlace directo de descarga
+// === FUNCIÓN ACTUALIZADA PARA DESCARGA DIRECTA EN KODULAR ===
 async function downloadExcelForKodular() {
   try {
     showLoadingMessage('Generando archivo Excel...');
 
-    // Construir datos del inventario
+    // Encabezados
     const data = [
       ["Producto", "Marca", "Stock", "Unidad", "Mínimo"]
     ];
 
+    // Llenar datos del inventario
     products.forEach(p => {
       data.push([
         p.name,
@@ -2266,40 +2266,37 @@ async function downloadExcelForKodular() {
     const ws = XLSX.utils.aoa_to_sheet(data);
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
-    // Convertir a blob
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], { type: "application/octet-stream" });
+    // Convertir a base64 (en lugar de blob)
+    const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
-    // Crear URL de descarga directa
-    const url = URL.createObjectURL(blob);
+    // Crear un enlace de descarga usando base64
+    const fileName = 'Inventario_' + new Date().toISOString().split('T')[0] + '.xlsx';
+    const url = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
 
-    // Enviar URL a Kodular si está conectado por WebView
+    // ✅ Si estamos en Kodular, enviar la URL al WebViewer
     if (window.AppInventor) {
       window.AppInventor.setWebViewString(url);
     }
 
-    // Simular descarga normal en navegador también
+    // También funciona desde el navegador normal
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Inventario_' + new Date().toISOString().split('T')[0] + '.xlsx';
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
 
-    // Limpieza
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
     hideLoadingMessage();
     showNotification('✅ Archivo Excel generado correctamente', 'success');
-
   } catch (error) {
     console.error('❌ Error al generar Excel:', error);
     hideLoadingMessage();
     showNotification('⚠️ No se pudo generar el Excel', 'error');
   }
 }
-
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ec4304e541a274',t:'MTc2MDQ5OTI3Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
+
 
 
 
