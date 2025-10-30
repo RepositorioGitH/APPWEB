@@ -2240,11 +2240,67 @@
         }
 
 
+// === NUEVA FUNCIÓN PARA DESCARGA DIRECTA COMPATIBLE CON KODULAR ===
+// Esta función genera el archivo Excel y devuelve un enlace directo de descarga
+async function downloadExcelForKodular() {
+  try {
+    showLoadingMessage('Generando archivo Excel...');
 
+    // Construir datos del inventario
+    const data = [
+      ["Producto", "Marca", "Stock", "Unidad", "Mínimo"]
+    ];
+
+    products.forEach(p => {
+      data.push([
+        p.name,
+        p.brand || '',
+        p.currentStock,
+        p.unit,
+        p.minStock
+      ]);
+    });
+
+    // Crear libro Excel
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+
+    // Convertir a blob
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
+
+    // Crear URL de descarga directa
+    const url = URL.createObjectURL(blob);
+
+    // Enviar URL a Kodular si está conectado por WebView
+    if (window.AppInventor) {
+      window.AppInventor.setWebViewString(url);
+    }
+
+    // Simular descarga normal en navegador también
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Inventario_' + new Date().toISOString().split('T')[0] + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+
+    // Limpieza
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    hideLoadingMessage();
+    showNotification('✅ Archivo Excel generado correctamente', 'success');
+
+  } catch (error) {
+    console.error('❌ Error al generar Excel:', error);
+    hideLoadingMessage();
+    showNotification('⚠️ No se pudo generar el Excel', 'error');
+  }
+}
 
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ec4304e541a274',t:'MTc2MDQ5OTI3Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
+
 
 
 
